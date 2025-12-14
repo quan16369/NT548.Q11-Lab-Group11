@@ -17,7 +17,7 @@ availability_zone = "us-east-1a"
 instance_type = "t2.micro"
 
 # Name of the SSH key pair to access the EC2 instance
-key_name = "mykey1"
+key_name = "mykey"
 
 # AMI ID for the EC2 instance
 ami_id = "ami-0866a3c8686eaeeba"
