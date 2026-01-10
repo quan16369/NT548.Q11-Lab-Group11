@@ -102,9 +102,3 @@ terraform destroy -auto-approve
 - Ensure your IP is added to `allowed_ip` in `terraform.tfvars`
 - Sensitive files (`.terraform/`, `*.tfstate`, `terraform.tfvars`) are already gitignored
 
-## Team Members
-- [Member Name] - [Student ID]
-
-## References
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [AWS VPC Documentation](https://docs.aws.amazon.com/vpc/)
