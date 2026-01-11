@@ -1,17 +1,17 @@
 # CloudFormation Infrastructure Deployment
 
-## Tổng quan
+## Overview
 
-Thư mục này chứa các CloudFormation templates để triển khai infrastructure AWS tương tự như phần Terraform, bao gồm:
+This directory contains CloudFormation templates to deploy AWS infrastructure similar to the Terraform implementation, including:
 
-- **VPC** với Public và Private Subnets
-- **Internet Gateway** cho Public Subnet
-- **NAT Gateway** cho Private Subnet
-- **Route Tables** cho cả Public và Private Subnets
-- **Security Groups** để bảo mật EC2 instances
-- **EC2 Instances** trong cả Public và Private Subnets
+- **VPC** with Public and Private Subnets
+- **Internet Gateway** for Public Subnet
+- **NAT Gateway** for Private Subnet
+- **Route Tables** for both Public and Private Subnets
+- **Security Groups** for securing EC2 instances
+- **EC2 Instances** in both Public and Private Subnets
 
-## Cấu trúc thư mục
+## Directory Structure
 
 ```
 cloudformation/
@@ -19,69 +19,69 @@ cloudformation/
 ├── parameters.json              # Parameters file
 ├── nested-stacks/              # Nested stack templates
 │   ├── vpc-stack.yaml          # VPC, Subnets, Internet Gateway
-│   ├── nat-stack.yaml          # NAT Gateway và Elastic IP
-│   ├── route-tables-stack.yaml # Route Tables và associations
-│   ├── security-groups-stack.yaml # Security Groups và rules
+│   ├── nat-stack.yaml          # NAT Gateway and Elastic IP
+│   ├── route-tables-stack.yaml # Route Tables and associations
+│   ├── security-groups-stack.yaml # Security Groups and rules
 │   └── ec2-stack.yaml          # EC2 Instances
 └── README.md                    # This file
 ```
 
-## Yêu cầu trước khi triển khai
+## Prerequisites
 
-### 1. AWS CLI đã được cấu hình
+### 1. AWS CLI Configured
 ```bash
 aws configure
 ```
 
-### 2. Tạo S3 bucket để lưu nested stack templates
+### 2. Create S3 Bucket for Nested Stack Templates
 
-CloudFormation yêu cầu nested stacks phải được upload lên S3:
+CloudFormation requires nested stacks to be uploaded to S3:
 
 ```bash
-# Tạo S3 bucket (thay YOUR-BUCKET-NAME bằng tên bucket của bạn)
+# Create S3 bucket (replace YOUR-BUCKET-NAME with your bucket name)
 aws s3 mb s3://YOUR-BUCKET-NAME --region us-east-1
 
-# Upload nested stack templates lên S3
+# Upload nested stack templates to S3
 aws s3 cp nested-stacks/ s3://YOUR-BUCKET-NAME/cloudformation/nested-stacks/ --recursive
 ```
 
-### 3. Tạo EC2 Key Pair
+### 3. Create EC2 Key Pair
 
-CloudFormation không tự động tạo file .pem, bạn cần tạo key pair trước:
+CloudFormation doesn't automatically create .pem files, you need to create the key pair first:
 
 ```bash
-# Tạo key pair và lưu private key
+# Create key pair and save private key
 aws ec2 create-key-pair --key-name mykey --query 'KeyMaterial' --output text > mykey.pem
 
-# Đặt quyền cho private key
+# Set permissions for private key
 chmod 400 mykey.pem
 ```
 
-### 4. Cập nhật parameters.json
+### 4. Update parameters.json
 
-Sửa file `parameters.json` và thay đổi các giá trị:
+Edit the `parameters.json` file and change the values:
 
 ```json
 {
   "ParameterKey": "NestedStacksS3Bucket",
-  "ParameterValue": "YOUR-BUCKET-NAME-HERE"  # Thay bằng tên S3 bucket của bạn
+  "ParameterValue": "YOUR-BUCKET-NAME-HERE"  # Replace with your S3 bucket name
 },
 {
   "ParameterKey": "AllowedIP",
-  "ParameterValue": "YOUR-IP-HERE/32"  # Thay bằng IP của bạn
+  "ParameterValue": "YOUR-IP-HERE/32"  # Replace with your IP address
 }
 ```
 
-## Cách triển khai
+## Deployment Instructions
 
-### Phương pháp 1: Deploy bằng AWS CLI
+### Method 1: Deploy via AWS CLI
 
 ```bash
-# Validate template trước
+# Validate template first
 aws cloudformation validate-template \
   --template-body file://main-stack.yaml
 
-# Create stack với parameters từ file JSON
+# Create stack with parameters from JSON file
 aws cloudformation create-stack \
   --stack-name lab1-infrastructure \
   --template-body file://main-stack.yaml \
@@ -89,32 +89,32 @@ aws cloudformation create-stack \
   --capabilities CAPABILITY_IAM \
   --region us-east-1
 
-# Theo dõi quá trình deploy
+# Monitor deployment progress
 aws cloudformation describe-stack-events \
   --stack-name lab1-infrastructure \
   --query 'StackEvents[*].[Timestamp,ResourceStatus,ResourceType,LogicalResourceId]' \
   --output table
 
-# Xem outputs
+# View outputs
 aws cloudformation describe-stacks \
   --stack-name lab1-infrastructure \
   --query 'Stacks[0].Outputs' \
   --output table
 ```
 
-### Phương pháp 2: Deploy bằng AWS Console
+### Method 2: Deploy via AWS Console
 
-1. Đăng nhập AWS Console
-2. Vào **CloudFormation** service
+1. Log in to AWS Console
+2. Go to **CloudFormation** service
 3. Click **Create stack** > **With new resources**
-4. Chọn **Upload a template file** và upload `main-stack.yaml`
-5. Nhập Stack name: `lab1-infrastructure`
-6. Điền các parameters (VpcCIDR, SubnetCIDR, AllowedIP, S3Bucket, etc.)
+4. Select **Upload a template file** and upload `main-stack.yaml`
+5. Enter Stack name: `lab1-infrastructure`
+6. Fill in parameters (VpcCIDR, SubnetCIDR, AllowedIP, S3Bucket, etc.)
 7. Click **Next** > **Next** > **Create stack**
 
-## Kiểm tra kết quả
+## Verify Results
 
-### 1. Xem stack outputs
+### 1. View Stack Outputs
 
 ```bash
 aws cloudformation describe-stacks \
@@ -122,7 +122,7 @@ aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs'
 ```
 
-### 2. Kiểm tra resources đã tạo
+### 2. Check Created Resources
 
 ```bash
 # VPC
@@ -138,35 +138,35 @@ aws ec2 describe-instances --filters "Name=tag:Name,Values=Public Instance"
 aws ec2 describe-security-groups --filters "Name=group-name,Values=Public Security Group"
 ```
 
-### 3. SSH vào Public EC2 Instance
+### 3. SSH into Public EC2 Instance
 
 ```bash
-# Lấy Public IP từ stack outputs
+# Get Public IP from stack outputs
 PUBLIC_IP=$(aws cloudformation describe-stacks \
   --stack-name lab1-infrastructure \
   --query 'Stacks[0].Outputs[?OutputKey==`PublicInstancePublicIP`].OutputValue' \
   --output text)
 
-# SSH vào instance
+# SSH into instance
 ssh -i mykey.pem ubuntu@$PUBLIC_IP
 ```
 
-## Xóa infrastructure
+## Delete Infrastructure
 
 ```bash
-# Delete stack (sẽ xóa tất cả resources)
+# Delete stack (will delete all resources)
 aws cloudformation delete-stack --stack-name lab1-infrastructure
 
-# Theo dõi quá trình xóa
+# Monitor deletion progress
 aws cloudformation describe-stack-events \
   --stack-name lab1-infrastructure \
   --query 'StackEvents[*].[Timestamp,ResourceStatus,ResourceType]' \
   --output table
 ```
 
-**Lưu ý**: Xóa stack sẽ tự động xóa tất cả nested stacks và resources theo thứ tự đúng.
+**Note**: Deleting the stack will automatically delete all nested stacks and resources in the correct order.
 
-## Validate templates với cfn-lint
+## Validate Templates with cfn-lint
 
 Install cfn-lint:
 ```bash
@@ -178,61 +178,61 @@ Validate templates:
 # Validate main stack
 cfn-lint main-stack.yaml
 
-# Validate tất cả nested stacks
+# Validate all nested stacks
 cfn-lint nested-stacks/*.yaml
 ```
 
-## So sánh với Terraform
+## Comparison with Terraform
 
-| Khía cạnh | Terraform | CloudFormation |
-|-----------|-----------|----------------|
-| **Modules** | Local modules trong `./modules/` | Nested stacks trên S3 |
-| **State** | S3 backend với DynamoDB lock | AWS quản lý tự động |
+| Aspect | Terraform | CloudFormation |
+|--------|-----------|----------------|
+| **Modules** | Local modules in `./modules/` | Nested stacks on S3 |
+| **State** | S3 backend with DynamoDB lock | AWS managed automatically |
 | **Destroy** | `terraform destroy` | `aws cloudformation delete-stack` |
-| **Rules tách riêng** | `aws_security_group_rule` | `AWS::EC2::SecurityGroupIngress/Egress` |
-| **Key Pair** | Tạo tự động với `tls_private_key` | Phải tạo thủ công trước |
+| **Separated Rules** | `aws_security_group_rule` | `AWS::EC2::SecurityGroupIngress/Egress` |
+| **Key Pair** | Auto-created with `tls_private_key` | Must create manually first |
 
 ## Troubleshooting
 
-### Lỗi: Template URL is not valid
+### Error: Template URL is not valid
 
-- Kiểm tra S3 bucket name trong `parameters.json`
-- Đảm bảo đã upload nested stacks lên S3
-- Kiểm tra S3 bucket permissions
+- Check S3 bucket name in `parameters.json`
+- Ensure nested stacks are uploaded to S3
+- Verify S3 bucket permissions
 
-### Lỗi: Key pair does not exist
+### Error: Key pair does not exist
 
 ```bash
-# Kiểm tra key pair
+# Check key pair
 aws ec2 describe-key-pairs --key-names mykey
 
-# Tạo mới nếu chưa có
+# Create new if doesn't exist
 aws ec2 create-key-pair --key-name mykey --query 'KeyMaterial' --output text > mykey.pem
 chmod 400 mykey.pem
 ```
 
-### Stack bị ROLLBACK_COMPLETE
+### Stack in ROLLBACK_COMPLETE State
 
 ```bash
-# Xem lỗi chi tiết
+# View detailed error
 aws cloudformation describe-stack-events \
   --stack-name lab1-infrastructure \
   --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`]'
 
-# Xóa stack lỗi và thử lại
+# Delete failed stack and try again
 aws cloudformation delete-stack --stack-name lab1-infrastructure
 ```
 
 ## Best Practices
 
-1. **Luôn validate template trước khi deploy**
-2. **Sử dụng cfn-lint để check lỗi syntax**
-3. **Upload nested stacks lên S3 với versioning enabled**
-4. **Sử dụng Change Sets để preview changes**
-5. **Tag tất cả resources để dễ quản lý**
-6. **Backup parameters.json nhưng không commit sensitive data**
+1. **Always validate templates before deploying**
+2. **Use cfn-lint to check for syntax errors**
+3. **Upload nested stacks to S3 with versioning enabled**
+4. **Use Change Sets to preview changes**
+5. **Tag all resources for easy management**
+6. **Backup parameters.json but don't commit sensitive data**
 
-## Tài liệu tham khảo
+## References
 
 - [AWS CloudFormation Documentation](https://docs.aws.amazon.com/cloudformation/)
 - [CloudFormation Best Practices](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/best-practices.html)
