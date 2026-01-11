@@ -1,12 +1,29 @@
 # Lab1_Infrastructure - NT548 DevOps Practice
 
 ## Project Description
-AWS infrastructure deployment practice using Terraform, including:
+AWS infrastructure deployment practice using **Terraform** and **CloudFormation**, including:
 - VPC with Public and Private Subnets
 - Internet Gateway and NAT Gateway
 - Route Tables for Public and Private subnets
 - EC2 instances (Public and Private)
 - Security Groups for security control
+
+## Implementation Methods
+This project includes **TWO** implementation methods as required by NT548-BaiTapThucHanh-01:
+
+### 1. Terraform Implementation
+- Modular structure with separate modules for each AWS service
+- S3 backend with DynamoDB state locking
+- Native Terraform testing framework
+- **Location**: Root directory (`main.tf`, `modules/`, etc.)
+
+### 2. CloudFormation Implementation  
+- Nested stacks architecture
+- AWS-managed state
+- cfn-lint validation support
+- **Location**: `cloudformation/` directory
+
+Both implementations deploy **identical infrastructure** with the same specifications.
 
 ## System Architecture
 ```
@@ -107,12 +124,67 @@ For deployed infrastructure, use:
 See [TESTING.md](TESTING.md) for detailed testing guide.
 
 ## Cleanup
+
+### Terraform
 ```bash
+# Option 1: Direct destroy
 terraform destroy -auto-approve
+
+# Option 2: Safe destroy (recommended - destroys in correct order)
+./safe-destroy.sh
 ```
 
+### CloudFormation
+```bash
+cd cloudformation/
+./destroy.sh
+```
+
+---
+
+## CloudFormation Implementation
+
+The `cloudformation/` directory contains an equivalent implementation using AWS CloudFormation with nested stacks.
+
+### Quick Start - CloudFormation
+```bash
+cd cloudformation/
+
+# Deploy infrastructure
+./deploy.sh YOUR-S3-BUCKET-NAME
+
+# Destroy infrastructure
+./destroy.sh
+```
+
+See [cloudformation/README.md](cloudformation/README.md) for detailed CloudFormation deployment guide.
+
+---
+
+## Comparison: Terraform vs CloudFormation
+
+| Feature | Terraform | CloudFormation |
+|---------|-----------|----------------|
+| **State Management** | S3 + DynamoDB | AWS Managed |
+| **Module System** | Local modules | Nested stacks on S3 |
+| **Syntax** | HCL | YAML/JSON |
+| **Security Groups** | Separate `aws_security_group_rule` | Separate `AWS::EC2::SecurityGroupIngress/Egress` |
+| **Key Pair** | Auto-generated with TLS | Manual creation required |
+| **Destroy Time** | Fast (with `safe-destroy.sh`) | Fast (automatic dependency resolution) |
+| **Validation** | `terraform validate` | `cfn-lint`, `aws cloudformation validate-template` |
+
+Both implementations follow **best practices**:
+- ✅ Security Group rules are separate resources (prevents circular dependencies)
+- ✅ Modular/Nested structure for maintainability
+- ✅ Proper tagging for all resources
+- ✅ Encrypted EBS volumes
+- ✅ IMDSv2 required for EC2 metadata
+
+---
+
 ## Notes
-- File `my_key.pem` will be automatically created for SSH access to instances
-- Ensure your IP is added to `allowed_ip` in `terraform.tfvars`
-- Sensitive files (`.terraform/`, `*.tfstate`, `terraform.tfvars`) are already gitignored
+- File `my_key.pem` will be automatically created for SSH access (Terraform only)
+- For CloudFormation, key pair must be created before deployment
+- Ensure your IP is added to `allowed_ip` in `terraform.tfvars` or CloudFormation parameters
+- Sensitive files (`.terraform/`, `*.tfstate`, `terraform.tfvars`, `*.pem`) are gitignored
 

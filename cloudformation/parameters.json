@@ -1,0 +1,42 @@
+[
+  {
+    "ParameterKey": "VpcCIDR",
+    "ParameterValue": "10.0.0.0/16"
+  },
+  {
+    "ParameterKey": "PublicSubnetCIDR",
+    "ParameterValue": "10.0.1.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetCIDR",
+    "ParameterValue": "10.0.2.0/24"
+  },
+  {
+    "ParameterKey": "AvailabilityZone",
+    "ParameterValue": "us-east-1a"
+  },
+  {
+    "ParameterKey": "AllowedIP",
+    "ParameterValue": "112.197.32.245/32"
+  },
+  {
+    "ParameterKey": "AMIId",
+    "ParameterValue": "ami-0866a3c8686eaeeba"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.micro"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "mykey"
+  },
+  {
+    "ParameterKey": "NestedStacksS3Bucket",
+    "ParameterValue": "YOUR-S3-BUCKET-NAME-HERE"
+  },
+  {
+    "ParameterKey": "NestedStacksS3KeyPrefix",
+    "ParameterValue": "cloudformation/nested-stacks/"
+  }
+]

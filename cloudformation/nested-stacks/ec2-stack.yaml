@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EC2 Stack - Creates Public and Private EC2 Instances with Key Pair'
+
+Parameters:
+  AMIId:
+    Type: String
+    Default: 'ami-0866a3c8686eaeeba'
+    Description: AMI ID for Ubuntu 24.04 LTS in us-east-1
+  
+  InstanceType:
+    Type: String
+    Default: 't2.micro'
+    Description: EC2 Instance Type
+  
+  KeyName:
+    Type: String
+    Default: 'mykey'
+    Description: Name of EC2 Key Pair
+  
+  PublicSubnetId:
+    Type: String
+    Description: Public Subnet ID
+  
+  PrivateSubnetId:
+    Type: String
+    Description: Private Subnet ID
+  
+  PublicSecurityGroupId:
+    Type: String
+    Description: Public Security Group ID
+  
+  PrivateSecurityGroupId:
+    Type: String
+    Description: Private Security Group ID
+
+Resources:
+  # EC2 Key Pair (Note: CloudFormation doesn't create .pem file automatically)
+  # You need to create this key pair manually or use existing one
+  
+  # Public EC2 Instance
+  PublicEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PublicSubnetId
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroupId
+      EbsOptimized: true
+      Monitoring: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 8
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+        InstanceMetadataTags: enabled
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update
+          apt-get install -y nginx
+          systemctl start nginx
+          systemctl enable nginx
+      Tags:
+        - Key: Name
+          Value: Public Instance
+
+  # Private EC2 Instance
+  PrivateEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PrivateSubnetId
+      SecurityGroupIds:
+        - !Ref PrivateSecurityGroupId
+      EbsOptimized: true
+      Monitoring: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 8
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+        InstanceMetadataTags: enabled
+      Tags:
+        - Key: Name
+          Value: Private Instance
+
+Outputs:
+  PublicInstanceId:
+    Description: Public EC2 Instance ID
+    Value: !Ref PublicEC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicInstanceId'
+  
+  PublicInstancePublicIP:
+    Description: Public EC2 Instance Public IP
+    Value: !GetAtt PublicEC2Instance.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicInstancePublicIP'
+  
+  PrivateInstanceId:
+    Description: Private EC2 Instance ID
+    Value: !Ref PrivateEC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateInstanceId'
+  
+  PrivateInstancePrivateIP:
+    Description: Private EC2 Instance Private IP
+    Value: !GetAtt PrivateEC2Instance.PrivateIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateInstancePrivateIP'
