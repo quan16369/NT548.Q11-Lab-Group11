@@ -1,118 +1,196 @@
-# Lab1_Infrastructure - NT548 DevOps Practice
+# Lab 2 – Quản lý và triển khai hạ tầng AWS và ứng dụng Microservices
 
-## Project Description
-AWS infrastructure deployment practice using Terraform, including:
-- VPC with Public and Private Subnets
-- Internet Gateway and NAT Gateway
-- Route Tables for Public and Private subnets
-- EC2 instances (Public and Private)
-- Security Groups for security control
+## 1. Giới thiệu
 
-## System Architecture
-```
-VPC (10.0.0.0/16)
-├── Public Subnet (10.0.1.0/24)
-│   ├── Internet Gateway
-│   ├── NAT Gateway
-│   └── EC2 Public Instance
-└── Private Subnet (10.0.2.0/24)
-    └── EC2 Private Instance
-```
+Bài Lab 2 tập trung vào việc quản lý và tự động hóa triển khai hạ tầng AWS cũng như ứng dụng microservices bằng các công cụ DevOps phổ biến, bao gồm:
 
-## Module Structure
+* **Terraform + GitHub Actions + Checkov**
+* **CloudFormation + AWS CodePipeline + CodeBuild**
+* **Jenkins CI/CD + Docker + Kubernetes (EKS) + SonarQube + Trivy**
+
+Toàn bộ mã nguồn được tổ chức trong một repository duy nhất, mỗi phần có README riêng mô tả chi tiết cách triển khai.
+
+---
+
+## 2. Kiến trúc tổng thể
+
+Lab 2 gồm **3 phần độc lập**, tương ứng với yêu cầu đề bài:
+
+### Phần 1 – Terraform + GitHub Actions
+
+* Triển khai hạ tầng AWS: VPC, Route Tables, NAT Gateway, EC2, Security Groups
+* Tự động hóa deploy bằng GitHub Actions
+* Kiểm tra bảo mật Terraform bằng **Checkov**
+
+📁 Thư mục chính:
+
 ```
-Lab1_Infrastructure/
+/
+├── main.tf
 ├── modules/
-│   ├── Vpc/              # VPC, Subnets, Internet Gateway
-│   ├── NAT-Gateway/      # NAT Gateway and Elastic IP
-│   ├── Route-Tables/     # Public and Private Route Tables
-│   ├── EC2/              # EC2 Instances and SSH Key
-│   └── Security-Groups/  # Security Groups
-├── tests/                # Test cases
-└── scripts/              # Setup scripts
+├── tests/
+└── .github/workflows/terraform-deploy.yml
 ```
 
-## Installation Guide
+👉 Chi tiết xem tại: **README-TERRAFORM.md**
 
-### 1. Configure AWS Credentials
-```bash
-aws configure
+---
+
+### Phần 2 – CloudFormation + AWS CodePipeline
+
+* Triển khai hạ tầng AWS tương tự phần 1 bằng CloudFormation (nested stacks)
+* Kiểm tra template bằng **cfn-lint** và **taskcat**
+* Tự động build & deploy bằng **AWS CodePipeline + CodeBuild**
+
+📁 Thư mục chính:
+
 ```
-Enter the following information:
-- AWS Access Key ID
-- AWS Secret Access Key  
-- Default region: us-east-1
-- Output format: json
-
-### 2. Configure Variables
-```bash
-cp terraform.tfvars.example terraform.tfvars
+cloudformation/
+├── main-stack.yaml
+├── nested-stacks/
+└── buildspec.yml
 ```
-Edit `terraform.tfvars` with your information:
-- `vpc_cidr`: CIDR block for VPC
-- `allowed_ip`: IP address allowed to SSH into Public instance
-- `key_name`: SSH key pair name
 
-### 3. Create S3 Backend
-```bash
-chmod +x scripts/setup-backend.sh
-./scripts/setup-backend.sh
+👉 Chi tiết xem tại: **cloudformation/README.md**
+
+---
+
+### Phần 3 – Jenkins CI/CD cho Microservices
+
+* Ứng dụng microservices gồm `user-service` và `product-service`
+* Jenkins tự động:
+
+  * Build
+  * Test
+  * SonarQube scan
+  * Build & push Docker image
+  * Security scan bằng Trivy
+  * Deploy lên Kubernetes (EKS)
+
+📁 Thư mục chính:
+
 ```
-**Note**: Update S3 bucket name in `backend.tf` if needed
+microservices/
+├── Jenkinsfile
+├── user-service/
+├── product-service/
+└── k8s/
+```
 
-### 4. Initialize and Deploy
+👉 Chi tiết xem tại: **microservices/README.md**
+
+---
+
+## 3. Yêu cầu môi trường chung
+
+### 3.1 Tài khoản & quyền
+
+* AWS Account
+* IAM User / Role có quyền:
+
+  * EC2, VPC, IAM
+  * CloudFormation
+  * EKS
+  * S3, CodePipeline, CodeBuild
+
+### 3.2 Công cụ cài đặt trên máy local / EC2
+
+* AWS CLI
+* Terraform
+* Git
+* Docker
+* kubectl
+* eksctl
+* Jenkins
+* SonarQube
+* Trivy
+
+---
+
+## 4. Cách chạy nhanh từng phần
+
+### Chạy Terraform (Phần 1)
+
 ```bash
-# Initialize Terraform
 terraform init
-
-# View deployment plan
 terraform plan
-
-# Deploy infrastructure
-terraform apply -auto-approve
+terraform apply
 ```
 
-## Verification
+Hoặc trigger GitHub Actions bằng cách push code lên repository.
 
-After successful deployment, verify the infrastructure:
+---
 
-### Option 1: View Outputs
+### Chạy CloudFormation (Phần 2)
+
 ```bash
-terraform output
+cd cloudformation
+./validate.sh
+./deploy.sh
 ```
 
-### Option 2: Run Validation Test (Recommended)
+Hoặc chạy tự động qua AWS CodePipeline.
+
+---
+
+### Chạy Jenkins Pipeline (Phần 3)
+
+1. Truy cập Jenkins Dashboard
+2. Tạo pipeline từ `microservices/Jenkinsfile`
+3. Build pipeline
+4. Kiểm tra:
+
+   * SonarQube Dashboard
+   * DockerHub images
+   * Kubernetes pods & services
+
+---
+
+## 5. Kiểm tra kết quả triển khai
+
+* **AWS Console**
+
+  * VPC, EC2, NAT Gateway
+  * CloudFormation stacks
+  * EKS Cluster & Node Groups
+
+* **Jenkins**
+
+  * Pipeline stages thành công
+
+* **SonarQube**
+
+  * Code quality report cho microservices
+
+* **DockerHub**
+
+  * Images được push thành công
+
+* **Kubernetes**
+
 ```bash
-# Run simple validation test (does not create new resources)
-terraform test simple-validation.tftest.hcl
-```
-This test validates existing infrastructure without creating duplicates.
-
-### Option 3: SSH Connection Test
-```bash
-# Get public IP from outputs
-PUBLIC_IP=$(terraform output -json | jq -r '.EC2.value.public_instance_public_ip')
-
-# Connect to public instance
-ssh -i my_key.pem ubuntu@$PUBLIC_IP
+kubectl get nodes
+kubectl get pods
+kubectl get svc
 ```
 
-## Test Cases
+---
 
-**Important:** The test files in `tests/` directory are for clean-room testing (deploying from scratch). Do NOT run them after infrastructure is already deployed as they will try to create duplicate resources.
+## 6. Tài liệu chi tiết
 
-For deployed infrastructure, use:
-- `simple-validation.tftest.hcl` - Validates existing resources
+| Phần                          | File README              |
+| ----------------------------- | ------------------------ |
+| Terraform + GitHub Actions    | README-TERRAFORM.md      |
+| CloudFormation + CodePipeline | cloudformation/README.md |
+| Jenkins + Microservices       | microservices/README.md  |
 
-See [TESTING.md](TESTING.md) for detailed testing guide.
+---
 
-## Cleanup
-```bash
-terraform destroy -auto-approve
-```
+## 7. Ghi chú
 
-## Notes
-- File `my_key.pem` will be automatically created for SSH access to instances
-- Ensure your IP is added to `allowed_ip` in `terraform.tfvars`
-- Sensitive files (`.terraform/`, `*.tfstate`, `terraform.tfvars`) are already gitignored
+* Các file README.md và TESTING.md của Lab 1 **không sử dụng để chấm Lab 2**
+* Lab 2 tập trung vào tự động hóa, CI/CD và kiểm tra chất lượng – bảo mật
 
+---
+
+**Hoàn thành Lab 2 – NT548**

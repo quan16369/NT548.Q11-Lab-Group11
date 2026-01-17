@@ -1,239 +1,234 @@
-# CloudFormation Infrastructure Deployment
+# Lab 2 – Phần 2
 
-## Overview
+## Triển khai hạ tầng AWS với CloudFormation và AWS CodePipeline
 
-This directory contains CloudFormation templates to deploy AWS infrastructure similar to the Terraform implementation, including:
+---
 
-- **VPC** with Public and Private Subnets
-- **Internet Gateway** for Public Subnet
-- **NAT Gateway** for Private Subnet
-- **Route Tables** for both Public and Private Subnets
-- **Security Groups** for securing EC2 instances
-- **EC2 Instances** in both Public and Private Subnets
+## 1. Mục tiêu
 
-## Directory Structure
+Phần này triển khai hạ tầng AWS bằng **CloudFormation**, quản lý mã nguồn bằng **AWS CodeCommit** và tự động hóa quá trình build & deploy bằng **AWS CodePipeline**, đáp ứng yêu cầu của Lab 2 – Phần 2.
 
-```
-cloudformation/
-├── main-stack.yaml              # Main CloudFormation stack (orchestrator)
-├── parameters.json              # Parameters file
-├── nested-stacks/              # Nested stack templates
-│   ├── vpc-stack.yaml          # VPC, Subnets, Internet Gateway
-│   ├── nat-stack.yaml          # NAT Gateway and Elastic IP
-│   ├── route-tables-stack.yaml # Route Tables and associations
-│   ├── security-groups-stack.yaml # Security Groups and rules
-│   └── ec2-stack.yaml          # EC2 Instances
-└── README.md                    # This file
-```
+Hạ tầng triển khai bao gồm:
 
-## Prerequisites
+* VPC
+* Route Tables
+* NAT Gateway
+* EC2
+* Security Groups
 
-### 1. AWS CLI Configured
+---
+
+## 2. Chuẩn bị môi trường
+
+### 2.1 Cấu hình AWS CLI
+
+Trên máy local:
+
 ```bash
 aws configure
 ```
 
-### 2. Create S3 Bucket for Nested Stack Templates
+Nhập:
 
-CloudFormation requires nested stacks to be uploaded to S3:
+* AWS Access Key ID
+* AWS Secret Access Key
+* Region: `us-east-1`
+* Output format: `json`
 
-```bash
-# Create S3 bucket (replace YOUR-BUCKET-NAME with your bucket name)
-aws s3 mb s3://YOUR-BUCKET-NAME --region us-east-1
+---
 
-# Upload nested stack templates to S3
-aws s3 cp nested-stacks/ s3://YOUR-BUCKET-NAME/cloudformation/nested-stacks/ --recursive
-```
+## 3. Tạo repository CodeCommit
 
-### 3. Create EC2 Key Pair
-
-CloudFormation doesn't automatically create .pem files, you need to create the key pair first:
+### 3.1 Tạo repository bằng AWS CLI
 
 ```bash
-# Create key pair and save private key
-aws ec2 create-key-pair --key-name mykey --query 'KeyMaterial' --output text > mykey.pem
-
-# Set permissions for private key
-chmod 400 mykey.pem
+aws codecommit create-repository \
+  --repository-name Lab2-CFN-Repo \
+  --repository-description "CloudFormation Lab 2"
 ```
 
-### 4. Update parameters.json
+---
 
-Edit the `parameters.json` file and change the values:
+### 3.2 Thêm remote CodeCommit
+
+```bash
+git remote add codecommit https://git-codecommit.us-east-1.amazonaws.com/v1/repos/Lab2-CFN-Repo
+```
+
+---
+
+### 3.3 Cấu hình credential cho CodeCommit
+
+#### Cách 1: Dùng Access Key & Secret Key
+
+```bash
+git config --global credential.helper '!aws codecommit credential-helper $@'
+git config --global credential.UseHttpPath true
+```
+
+#### Cách 2 (thay thế):
+
+* Vào **IAM → Users → Security credentials**
+* Tạo **HTTPS Git credentials for AWS CodeCommit**
+* Dùng username & password để đăng nhập Git
+
+---
+
+### 3.4 Push code lên CodeCommit
+
+```bash
+git push codecommit loc-dev
+```
+
+---
+
+## 4. Chuẩn bị tài nguyên AWS
+
+### 4.1 Tạo Key Pair
+
+Tạo keypair với tên:
+
+```
+devops-key
+```
+
+---
+
+### 4.2 Tạo IAM Role
+
+Tạo các role sau:
+
+* **CFN-Deploy-Role**
+
+  * Dùng cho CloudFormation deploy stack
+
+* **codebuild-Lab2-CFN-Build-service-role**
+
+  * Gắn policy: `AmazonS3FullAccess`
+
+---
+
+### 4.3 Tạo S3 Bucket
+
+Bucket dùng để lưu artifact:
+
+```
+nt548-terraform-state-1768057314
+```
+
+---
+
+## 5. CloudFormation Template
+
+### 5.1 Stack chính
+
+* File: `main-stack.yaml`
+* Stack name:
+
+```
+Lab2-CloudFormation-Stack
+```
+
+---
+
+### 5.2 Template đóng gói
+
+Sau khi package:
+
+```
+packaged-template.yaml
+```
+
+---
+
+### 5.3 Tham số truyền vào stack
 
 ```json
 {
-  "ParameterKey": "NestedStacksS3Bucket",
-  "ParameterValue": "YOUR-BUCKET-NAME-HERE"  # Replace with your S3 bucket name
-},
-{
-  "ParameterKey": "AllowedIP",
-  "ParameterValue": "YOUR-IP-HERE/32"  # Replace with your IP address
+  "KeyName": "devops-key",
+  "AllowedIP": "0.0.0.0/0",
+  "AMIId": "ami-0866a3c8686eaeeba",
+  "AvailabilityZone": "us-east-1a"
 }
 ```
 
-## Deployment Instructions
+---
 
-### Method 1: Deploy via AWS CLI
+## 6. AWS CodeBuild
 
-```bash
-# Validate template first
-aws cloudformation validate-template \
-  --template-body file://main-stack.yaml
+### 6.1 Tạo CodeBuild project
 
-# Create stack with parameters from JSON file
-aws cloudformation create-stack \
-  --stack-name lab1-infrastructure \
-  --template-body file://main-stack.yaml \
-  --parameters file://parameters.json \
-  --capabilities CAPABILITY_IAM \
-  --region us-east-1
+Tên project:
 
-# Monitor deployment progress
-aws cloudformation describe-stack-events \
-  --stack-name lab1-infrastructure \
-  --query 'StackEvents[*].[Timestamp,ResourceStatus,ResourceType,LogicalResourceId]' \
-  --output table
-
-# View outputs
-aws cloudformation describe-stacks \
-  --stack-name lab1-infrastructure \
-  --query 'Stacks[0].Outputs' \
-  --output table
+```
+Lab2-CFN-Build
 ```
 
-### Method 2: Deploy via AWS Console
+Environment variables:
 
-1. Log in to AWS Console
-2. Go to **CloudFormation** service
-3. Click **Create stack** > **With new resources**
-4. Select **Upload a template file** and upload `main-stack.yaml`
-5. Enter Stack name: `lab1-infrastructure`
-6. Fill in parameters (VpcCIDR, SubnetCIDR, AllowedIP, S3Bucket, etc.)
-7. Click **Next** > **Next** > **Create stack**
+* `ARTIFACT_BUCKET` = `nt548-terraform-state-1768057314`
 
-## Verify Results
+---
 
-### 1. View Stack Outputs
+### 6.2 Chức năng CodeBuild
 
-```bash
-aws cloudformation describe-stacks \
-  --stack-name lab1-infrastructure \
-  --query 'Stacks[0].Outputs'
+* Validate CloudFormation template
+* Build và package template
+* Xuất artifact cho pipeline
+
+---
+
+## 7. AWS CodePipeline
+
+### 7.1 Tạo Pipeline
+
+Tên pipeline:
+
+```
+Lab2-CFN-Pipeline
 ```
 
-### 2. Check Created Resources
+---
 
-```bash
-# VPC
-aws ec2 describe-vpcs --filters "Name=tag:Name,Values=VPC"
+### 7.2 Các stage trong Pipeline
 
-# Subnets
-aws ec2 describe-subnets --filters "Name=tag:Name,Values=Public Subnet"
+1. **Source**
 
-# EC2 Instances
-aws ec2 describe-instances --filters "Name=tag:Name,Values=Public Instance"
+   * Nguồn: CodeCommit
+   * Repository: `Lab2-CFN-Repo`
+   * Branch: `loc-dev`
 
-# Security Groups
-aws ec2 describe-security-groups --filters "Name=group-name,Values=Public Security Group"
-```
+2. **Build**
 
-### 3. SSH into Public EC2 Instance
+   * Dùng CodeBuild: `Lab2-CFN-Build`
 
-```bash
-# Get Public IP from stack outputs
-PUBLIC_IP=$(aws cloudformation describe-stacks \
-  --stack-name lab1-infrastructure \
-  --query 'Stacks[0].Outputs[?OutputKey==`PublicInstancePublicIP`].OutputValue' \
-  --output text)
+3. **Deploy**
 
-# SSH into instance
-ssh -i mykey.pem ubuntu@$PUBLIC_IP
-```
+   * Dùng CloudFormation
+   * Template: `packaged-template.yaml`
+   * Role: `CFN-Deploy-Role`
+   * Stack name: `Lab2-CloudFormation-Stack`
 
-## Delete Infrastructure
+---
 
-```bash
-# Delete stack (will delete all resources)
-aws cloudformation delete-stack --stack-name lab1-infrastructure
+## 8. Kiểm tra kết quả triển khai
 
-# Monitor deletion progress
-aws cloudformation describe-stack-events \
-  --stack-name lab1-infrastructure \
-  --query 'StackEvents[*].[Timestamp,ResourceStatus,ResourceType]' \
-  --output table
-```
+Sau khi pipeline chạy thành công:
 
-**Note**: Deleting the stack will automatically delete all nested stacks and resources in the correct order.
+* CloudFormation stack ở trạng thái `CREATE_COMPLETE`
+* EC2 instance được tạo
+* VPC, NAT Gateway, Route Tables, Security Groups tồn tại đúng cấu hình
 
-## Validate Templates with cfn-lint
+---
 
-Install cfn-lint:
-```bash
-pip install cfn-lint
-```
+## 9. Kết luận
 
-Validate templates:
-```bash
-# Validate main stack
-cfn-lint main-stack.yaml
+Phần này đã hoàn thành:
 
-# Validate all nested stacks
-cfn-lint nested-stacks/*.yaml
-```
+* Quản lý mã CloudFormation bằng CodeCommit
+* Tự động hóa build & deploy với CodePipeline
+* Triển khai hạ tầng AWS đầy đủ theo yêu cầu Lab 2 – Phần 2
 
-## Comparison with Terraform
+---
 
-| Aspect | Terraform | CloudFormation |
-|--------|-----------|----------------|
-| **Modules** | Local modules in `./modules/` | Nested stacks on S3 |
-| **State** | S3 backend with DynamoDB lock | AWS managed automatically |
-| **Destroy** | `terraform destroy` | `aws cloudformation delete-stack` |
-| **Separated Rules** | `aws_security_group_rule` | `AWS::EC2::SecurityGroupIngress/Egress` |
-| **Key Pair** | Auto-created with `tls_private_key` | Must create manually first |
-
-## Troubleshooting
-
-### Error: Template URL is not valid
-
-- Check S3 bucket name in `parameters.json`
-- Ensure nested stacks are uploaded to S3
-- Verify S3 bucket permissions
-
-### Error: Key pair does not exist
-
-```bash
-# Check key pair
-aws ec2 describe-key-pairs --key-names mykey
-
-# Create new if doesn't exist
-aws ec2 create-key-pair --key-name mykey --query 'KeyMaterial' --output text > mykey.pem
-chmod 400 mykey.pem
-```
-
-### Stack in ROLLBACK_COMPLETE State
-
-```bash
-# View detailed error
-aws cloudformation describe-stack-events \
-  --stack-name lab1-infrastructure \
-  --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`]'
-
-# Delete failed stack and try again
-aws cloudformation delete-stack --stack-name lab1-infrastructure
-```
-
-## Best Practices
-
-1. **Always validate templates before deploying**
-2. **Use cfn-lint to check for syntax errors**
-3. **Upload nested stacks to S3 with versioning enabled**
-4. **Use Change Sets to preview changes**
-5. **Tag all resources for easy management**
-6. **Backup parameters.json but don't commit sensitive data**
-
-## References
-
-- [AWS CloudFormation Documentation](https://docs.aws.amazon.com/cloudformation/)
-- [CloudFormation Best Practices](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/best-practices.html)
-- [Nested Stacks](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-nested-stacks.html)
+**Hoàn thành Lab 2 – Phần 2**
