@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Main Stack - Orchestrates all nested stacks for AWS Infrastructure (Compatible\
+  \ with cfn-lint, cloudformation package, CodePipeline)\n"
+Parameters:
+  VpcCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC
+  PublicSubnetCIDR:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR block for Public Subnet
+  PrivateSubnetCIDR:
+    Type: String
+    Default: 10.0.2.0/24
+    Description: CIDR block for Private Subnet
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Availability Zone for subnets
+  AllowedIP:
+    Type: String
+    Description: IP address allowed to SSH into Public EC2
+  AMIId:
+    Type: AWS::EC2::Image::Id
+    Description: AMI ID for EC2 instances
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    Description: EC2 instance type
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of EC2 Key Pair
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.us-east-1.amazonaws.com/nt548-terraform-state-1768057314/9bf1807a3dddeb093d27ac260cb51e11.template
+      Parameters:
+        VpcCIDR:
+          Ref: VpcCIDR
+        PublicSubnetCIDR:
+          Ref: PublicSubnetCIDR
+        PrivateSubnetCIDR:
+          Ref: PrivateSubnetCIDR
+        AvailabilityZone:
+          Ref: AvailabilityZone
+      Tags:
+      - Key: Name
+        Value: VPC-Stack
+  NATStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: https://s3.us-east-1.amazonaws.com/nt548-terraform-state-1768057314/058956132bf7ba42f5847ac60c66ed8f.template
+      Parameters:
+        PublicSubnetId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PublicSubnetId
+      Tags:
+      - Key: Name
+        Value: NAT-Stack
+  SecurityGroupsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: https://s3.us-east-1.amazonaws.com/nt548-terraform-state-1768057314/059a1e20543d80133dedac7ce6c14bd3.template
+      Parameters:
+        VPCId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.VPCId
+        AllowedIP:
+          Ref: AllowedIP
+      Tags:
+      - Key: Name
+        Value: SecurityGroups-Stack
+  RouteTablesStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+    - VPCStack
+    - NATStack
+    Properties:
+      TemplateURL: https://s3.us-east-1.amazonaws.com/nt548-terraform-state-1768057314/7e9ecbbcc6273262efd7378b77e80eb4.template
+      Parameters:
+        VPCId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.VPCId
+        InternetGatewayId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.InternetGatewayId
+        NATGatewayId:
+          Fn::GetAtt:
+          - NATStack
+          - Outputs.NATGatewayId
+        PublicSubnetId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PublicSubnetId
+        PrivateSubnetId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PrivateSubnetId
+      Tags:
+      - Key: Name
+        Value: RouteTables-Stack
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+    - VPCStack
+    - SecurityGroupsStack
+    Properties:
+      TemplateURL: https://s3.us-east-1.amazonaws.com/nt548-terraform-state-1768057314/c59dec497f521e5fc3293b1089679dc8.template
+      Parameters:
+        AMIId:
+          Ref: AMIId
+        InstanceType:
+          Ref: InstanceType
+        KeyName:
+          Ref: KeyName
+        PublicSubnetId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PublicSubnetId
+        PrivateSubnetId:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PrivateSubnetId
+        PublicSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupsStack
+          - Outputs.PublicSecurityGroupId
+        PrivateSecurityGroupId:
+          Fn::GetAtt:
+          - SecurityGroupsStack
+          - Outputs.PrivateSecurityGroupId
+      Tags:
+      - Key: Name
+        Value: EC2-Stack
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value:
+      Fn::GetAtt:
+      - VPCStack
+      - Outputs.VPCId
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value:
+      Fn::GetAtt:
+      - VPCStack
+      - Outputs.PublicSubnetId
+  PrivateSubnetId:
+    Description: Private Subnet ID
+    Value:
+      Fn::GetAtt:
+      - VPCStack
+      - Outputs.PrivateSubnetId
+  InternetGatewayId:
+    Description: Internet Gateway ID
+    Value:
+      Fn::GetAtt:
+      - VPCStack
+      - Outputs.InternetGatewayId
+  NATGatewayId:
+    Description: NAT Gateway ID
+    Value:
+      Fn::GetAtt:
+      - NATStack
+      - Outputs.NATGatewayId
+  PublicSecurityGroupId:
+    Description: Public Security Group ID
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupsStack
+      - Outputs.PublicSecurityGroupId
+  PrivateSecurityGroupId:
+    Description: Private Security Group ID
+    Value:
+      Fn::GetAtt:
+      - SecurityGroupsStack
+      - Outputs.PrivateSecurityGroupId
+  PublicRouteTableId:
+    Description: Public Route Table ID
+    Value:
+      Fn::GetAtt:
+      - RouteTablesStack
+      - Outputs.PublicRouteTableId
+  PrivateRouteTableId:
+    Description: Private Route Table ID
+    Value:
+      Fn::GetAtt:
+      - RouteTablesStack
+      - Outputs.PrivateRouteTableId
+  PublicInstanceId:
+    Description: Public EC2 Instance ID
+    Value:
+      Fn::GetAtt:
+      - EC2Stack
+      - Outputs.PublicInstanceId
+  PublicInstancePublicIP:
+    Description: Public EC2 Public IP
+    Value:
+      Fn::GetAtt:
+      - EC2Stack
+      - Outputs.PublicInstancePublicIP
+  PrivateInstanceId:
+    Description: Private EC2 Instance ID
+    Value:
+      Fn::GetAtt:
+      - EC2Stack
+      - Outputs.PrivateInstanceId
+  PrivateInstancePrivateIP:
+    Description: Private EC2 Private IP
+    Value:
+      Fn::GetAtt:
+      - EC2Stack
+      - Outputs.PrivateInstancePrivateIP

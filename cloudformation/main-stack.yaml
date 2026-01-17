@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Main Stack - Orchestrates all nested stacks for AWS Infrastructure
+  (Compatible with cfn-lint, cloudformation package, CodePipeline)
+
+Parameters:
+  VpcCIDR:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: CIDR block for VPC
+
+  PublicSubnetCIDR:
+    Type: String
+    Default: '10.0.1.0/24'
+    Description: CIDR block for Public Subnet
+
+  PrivateSubnetCIDR:
+    Type: String
+    Default: '10.0.2.0/24'
+    Description: CIDR block for Private Subnet
+
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Availability Zone for subnets
+
+  AllowedIP:
+    Type: String
+    Description: IP address allowed to SSH into Public EC2
+
+  AMIId:
+    Type: AWS::EC2::Image::Id
+    Description: AMI ID for EC2 instances
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    Description: EC2 instance type
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of EC2 Key Pair
+
+Resources:
+  # -------------------------
+  # VPC STACK
+  # -------------------------
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested-stacks/vpc-stack.yaml
+      Parameters:
+        VpcCIDR: !Ref VpcCIDR
+        PublicSubnetCIDR: !Ref PublicSubnetCIDR
+        PrivateSubnetCIDR: !Ref PrivateSubnetCIDR
+        AvailabilityZone: !Ref AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: VPC-Stack
+
+  # -------------------------
+  # NAT STACK
+  # -------------------------
+  NATStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: nested-stacks/nat-stack.yaml
+      Parameters:
+        PublicSubnetId: !GetAtt VPCStack.Outputs.PublicSubnetId
+      Tags:
+        - Key: Name
+          Value: NAT-Stack
+
+  # -------------------------
+  # SECURITY GROUPS STACK
+  # -------------------------
+  SecurityGroupsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: nested-stacks/security-groups-stack.yaml
+      Parameters:
+        VPCId: !GetAtt VPCStack.Outputs.VPCId
+        AllowedIP: !Ref AllowedIP
+      Tags:
+        - Key: Name
+          Value: SecurityGroups-Stack
+
+  # -------------------------
+  # ROUTE TABLES STACK
+  # -------------------------
+  RouteTablesStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - NATStack
+    Properties:
+      TemplateURL: nested-stacks/route-tables-stack.yaml
+      Parameters:
+        VPCId: !GetAtt VPCStack.Outputs.VPCId
+        InternetGatewayId: !GetAtt VPCStack.Outputs.InternetGatewayId
+        NATGatewayId: !GetAtt NATStack.Outputs.NATGatewayId
+        PublicSubnetId: !GetAtt VPCStack.Outputs.PublicSubnetId
+        PrivateSubnetId: !GetAtt VPCStack.Outputs.PrivateSubnetId
+      Tags:
+        - Key: Name
+          Value: RouteTables-Stack
+
+  # -------------------------
+  # EC2 STACK
+  # -------------------------
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - SecurityGroupsStack
+    Properties:
+      TemplateURL: nested-stacks/ec2-stack.yaml
+      Parameters:
+        AMIId: !Ref AMIId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        PublicSubnetId: !GetAtt VPCStack.Outputs.PublicSubnetId
+        PrivateSubnetId: !GetAtt VPCStack.Outputs.PrivateSubnetId
+        PublicSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.PublicSecurityGroupId
+        PrivateSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.PrivateSecurityGroupId
+      Tags:
+        - Key: Name
+          Value: EC2-Stack
+
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !GetAtt VPCStack.Outputs.VPCId
+
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value: !GetAtt VPCStack.Outputs.PublicSubnetId
+
+  PrivateSubnetId:
+    Description: Private Subnet ID
+    Value: !GetAtt VPCStack.Outputs.PrivateSubnetId
+
+  InternetGatewayId:
+    Description: Internet Gateway ID
+    Value: !GetAtt VPCStack.Outputs.InternetGatewayId
+
+  NATGatewayId:
+    Description: NAT Gateway ID
+    Value: !GetAtt NATStack.Outputs.NATGatewayId
+
+  PublicSecurityGroupId:
+    Description: Public Security Group ID
+    Value: !GetAtt SecurityGroupsStack.Outputs.PublicSecurityGroupId
+
+  PrivateSecurityGroupId:
+    Description: Private Security Group ID
+    Value: !GetAtt SecurityGroupsStack.Outputs.PrivateSecurityGroupId
+
+  PublicRouteTableId:
+    Description: Public Route Table ID
+    Value: !GetAtt RouteTablesStack.Outputs.PublicRouteTableId
+
+  PrivateRouteTableId:
+    Description: Private Route Table ID
+    Value: !GetAtt RouteTablesStack.Outputs.PrivateRouteTableId
+
+  PublicInstanceId:
+    Description: Public EC2 Instance ID
+    Value: !GetAtt EC2Stack.Outputs.PublicInstanceId
+
+  PublicInstancePublicIP:
+    Description: Public EC2 Public IP
+    Value: !GetAtt EC2Stack.Outputs.PublicInstancePublicIP
+
+  PrivateInstanceId:
+    Description: Private EC2 Instance ID
+    Value: !GetAtt EC2Stack.Outputs.PrivateInstanceId
+
+  PrivateInstancePrivateIP:
+    Description: Private EC2 Private IP
+    Value: !GetAtt EC2Stack.Outputs.PrivateInstancePrivateIP

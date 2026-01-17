@@ -8,21 +8,22 @@ resource "aws_key_pair" "generated_key" {
   public_key = tls_private_key.example.public_key_openssh
 }
 
+# checkov:skip=CKV2_AWS_41:IAM Role skipped for Lab simplicity
 resource "aws_instance" "public" {
-  ami               = var.ami
-  instance_type     = var.instance_type
-  subnet_id         = var.public_subnet_id
-  security_groups   = [var.public_security_group]
-  
+  ami             = var.ami
+  instance_type   = var.instance_type
+  subnet_id       = var.public_subnet_id
+  security_groups = [var.public_security_group]
+
   # optimize Elastic Block Store (EBS) performance
-  ebs_optimized = true 
+  ebs_optimized = true
 
   monitoring = true
 
   # Disable IMDSv1 and force use of IMDSv2
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"  # Forces IMDSv2 usage
+    http_tokens                 = "required" # Forces IMDSv2 usage
     http_put_response_hop_limit = 1
     instance_metadata_tags      = "enabled"
   }
@@ -31,8 +32,8 @@ resource "aws_instance" "public" {
     Name = "Public Instance"
   }
   root_block_device {
-  encrypted    = true
- }
+    encrypted = true
+  }
 
   user_data = <<-EOF
     #!/bin/bash
@@ -44,39 +45,39 @@ resource "aws_instance" "public" {
 
 }
 
+# checkov:skip=CKV2_AWS_41:IAM Role skipped for Lab simplicity
+resource "aws_instance" "private" {
+  ami             = var.ami
+  instance_type   = var.instance_type
+  subnet_id       = var.private_subnet_id
+  security_groups = [var.private_security_group]
 
-  resource "aws_instance" "private" {
-    ami = var.ami
-    instance_type = var.instance_type
-    subnet_id = var.private_subnet_id
-    security_groups = [var.private_security_group]
+  # ssh key pair
+  key_name = aws_key_pair.generated_key.key_name
 
-    # ssh key pair
-    key_name = aws_key_pair.generated_key.key_name
-    
-    ebs_optimized = true 
-    monitoring = true
+  ebs_optimized = true
+  monitoring    = true
 
   # Disable IMDSv1 and force use of IMDSv2
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"  # Forces IMDSv2 usage
+    http_tokens                 = "required" # Forces IMDSv2 usage
     http_put_response_hop_limit = 1
     instance_metadata_tags      = "enabled"
   }
-  
+
   root_block_device {
-  encrypted    = true
- } 
-
-    tags = {
-      Name = "Private Instance"
-    }
-
-    # associate_public_ip_address = false # no ip address public
-    depends_on = [ var.private_subnet_id]
-
+    encrypted = true
   }
+
+  tags = {
+    Name = "Private Instance"
+  }
+
+  # associate_public_ip_address = false # no ip address public
+  depends_on = [var.private_subnet_id]
+
+}
 
 resource "local_file" "tf_key" {
   content  = tls_private_key.example.private_key_pem

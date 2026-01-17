@@ -1,0 +1,80 @@
+name: "Terraform Infrastructure Deployment"
+
+on:
+  push:
+    branches:
+      - lab2
+  pull_request:
+    branches:
+      - lab2
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: "Terraform Checkov & Deploy"
+    runs-on: ubuntu-latest
+    
+    # [QUAN TRỌNG] Đặt biến môi trường ở đây để TOÀN BỘ các bước bên dưới đều nhận được Key
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: "us-east-1"
+      # Các biến Terraform
+      TF_VAR_vpc_cidr: "10.0.0.0/16"
+      TF_VAR_public_subnet_cidr: "10.0.1.0/24"
+      TF_VAR_private_subnet_cidr: "10.0.2.0/24"
+      TF_VAR_availability_zone: "us-east-1a"
+      TF_VAR_ami_id: "ami-0c55b159cbfafe1f0" 
+      TF_VAR_instance_type: "t2.micro"
+      TF_VAR_key_name: "devops-key"
+      TF_VAR_allowed_ip: "14.184.93.206/32"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # [MỚI] Bước này sẽ tự tạo S3 Bucket nếu chưa có
+      - name: Ensure S3 Backend Bucket Exists
+        run: |
+          BUCKET_NAME="nt548-terraform-state-1768057314"
+          if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Bucket $BUCKET_NAME already exists."
+          else
+            echo "Bucket $BUCKET_NAME does not exist. Creating..."
+            aws s3 mb s3://"$BUCKET_NAME" --region us-east-1
+            aws s3api put-bucket-versioning --bucket "$BUCKET_NAME" --versioning-configuration Status=Enabled
+            echo "Bucket created successfully."
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "latest"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          soft_fail: true 
+          quiet: true
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -input=false
+        continue-on-error: true
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/lab_2' && github.event_name == 'push'
+        run: terraform apply -auto-approve -input=false

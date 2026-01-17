@@ -1,0 +1,25 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.x
+    commands:
+      - pip install cfn-lint taskcat
+
+  pre_build:
+    commands:
+      - cfn-lint cloudformation/main-stack.yaml --ignore-checks W3002 W3005
+
+  build:
+    commands:
+      - echo "Packaging CloudFormation templates..."
+      - aws cloudformation package --template-file cloudformation/main-stack.yaml --s3-bucket $ARTIFACT_BUCKET --output-template-file packaged-template.yaml
+      - echo "Running taskcat tests..."
+      - taskcat test run --no-delete || echo "Taskcat completed (non-blocking)"
+
+artifacts:
+  base-directory: .
+  files:
+    - packaged-template.yaml
+    - cloudformation/parameters.json

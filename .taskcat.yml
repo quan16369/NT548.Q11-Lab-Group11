@@ -1,0 +1,18 @@
+project:
+  name: cloudformation-validation-lab
+  owner: student
+  regions:
+    - us-east-1
+
+tests:
+  main-stack-test:
+    template: cloudformation/main-stack.yaml
+    parameters:
+      VpcCIDR: 10.0.0.0/16
+      PublicSubnetCIDR: 10.0.1.0/24
+      PrivateSubnetCIDR: 10.0.2.0/24
+      AvailabilityZone: us-east-1a
+      AllowedIP: 112.197.32.245/32
+      AMIId: ami-0866a3c8686eaeeba
+      InstanceType: t2.micro
+      KeyName: mykey

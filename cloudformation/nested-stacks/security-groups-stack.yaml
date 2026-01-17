@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Security Groups Stack - Creates Public and Private Security Groups'
+
+Parameters:
+  VPCId:
+    Type: String
+    Description: VPC ID
+  
+  AllowedIP:
+    Type: String
+    Default: '0.0.0.0/0'
+    Description: IP address allowed to SSH into Public EC2 (format x.x.x.x/32)
+
+Resources:
+  # Public Security Group
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: Public Security Group
+      GroupDescription: Allow SSH access from a specific IP
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: Public Security Group
+
+  # Public SG - Ingress SSH Rule
+  PublicSGIngressSSH:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PublicSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref AllowedIP
+      Description: Allow SSH from a specific IP
+
+  # Public SG - Egress All Rule
+  PublicSGEgressAll:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref PublicSecurityGroup
+      IpProtocol: '-1'
+      FromPort: 0
+      ToPort: 0
+      CidrIp: 0.0.0.0/0
+      Description: Allow all outbound traffic
+
+  # Private Security Group
+  PrivateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: Private Security Group EC2
+      GroupDescription: Allow connections from Private EC2 instance
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: Private Security Group EC2
+
+  # Private SG - Ingress SSH from Public SG
+  PrivateSGIngressSSH:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
+      Description: Allow SSH from Public Security Group
+
+  # Private SG - Ingress All TCP from Public SG
+  PrivateSGIngressAllTCP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
+      Description: Allow all TCP ports from Public Security Group
+
+  # Private SG - Egress All Rule
+  PrivateSGEgressAll:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: '-1'
+      FromPort: 0
+      ToPort: 0
+      CidrIp: 0.0.0.0/0
+      Description: Allow all outbound traffic
+
+Outputs:
+  PublicSecurityGroupId:
+    Description: Public Security Group ID
+    Value: !Ref PublicSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicSecurityGroupId'
+  
+  PrivateSecurityGroupId:
+    Description: Private Security Group ID
+    Value: !Ref PrivateSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateSecurityGroupId'

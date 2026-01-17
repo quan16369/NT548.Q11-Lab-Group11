@@ -1,0 +1,14 @@
+# CloudFormation gitignore
+
+# Key files
+*.pem
+*.key
+
+# Parameters with sensitive data
+parameters-local.json
+
+# AWS CLI output
+outputs.json
+
+# Logs
+*.log
