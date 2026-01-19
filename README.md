@@ -186,11 +186,4 @@ kubectl get svc
 
 ---
 
-## 7. Ghi chú
-
-* Các file README.md và TESTING.md của Lab 1 **không sử dụng để chấm Lab 2**
-* Lab 2 tập trung vào tự động hóa, CI/CD và kiểm tra chất lượng – bảo mật
-
----
-
 **Hoàn thành Lab 2 – NT548**
