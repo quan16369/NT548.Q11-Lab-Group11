@@ -3,10 +3,10 @@ name: "Terraform Infrastructure Deployment"
 on:
   push:
     branches:
-      - loc-dev
+      - lab_2
   pull_request:
     branches:
-      - loc-dev
+      - lab_2
 
 permissions:
   contents: read
@@ -74,5 +74,5 @@ jobs:
         run: terraform plan -no-color -input=false
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/loc-dev' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/lab_2' && github.event_name == 'push'
         run: terraform apply -auto-approve -input=false
