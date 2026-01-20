@@ -129,7 +129,7 @@ cd cloudformation
 ./deploy.sh
 ```
 
-Hoặc chạy tự động qua AWS CodePipeline.
+Hoặc chạy tự động qua AWS CodePipeline
 
 ---
 
