@@ -184,6 +184,6 @@ kubectl get svc
 | CloudFormation + CodePipeline | cloudformation/README.md |
 | Jenkins + Microservices       | microservices/README.md  |
 
----
+----
 
 **Hoàn thành Lab 2 – NT548**
